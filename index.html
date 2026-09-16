@@ -109,10 +109,11 @@
             <div class="absolute -top-24 -right-24 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
             <div class="absolute -bottom-24 -left-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-            <div class="text-center mb-7">
-                <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-tr from-amber-500/20 to-cyan-500/20 border border-amber-500/40 mb-3 shadow-neon-gold">
-                    <i class="fa-solid fa-burst text-4xl text-amber-400 animate-spin" style="animation-duration: 8s;"></i>
-                </div>
+            <div class="text-center mb-7 pt-2">
+                <!-- BEYBLADE ARENA 上方的陀螺圖示：點擊即可進入主辦方密碼驗證 -->
+                <button id="btnCheckinAdminIcon" class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-tr from-amber-500/20 to-cyan-500/20 border border-amber-500/40 mb-3 shadow-neon-gold hover:scale-105 active:scale-95 transition-transform cursor-pointer group" title="主辦方後台驗證">
+                    <i class="fa-solid fa-burst text-4xl text-amber-400 animate-spin group-hover:text-amber-300" style="animation-duration: 8s;"></i>
+                </button>
                 <h1 class="text-2xl sm:text-3xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-200 to-cyan-400">
                     BEYBLADE ARENA
                 </h1>
@@ -301,8 +302,8 @@
 
             <!-- 後台主內容 (可滾動) -->
             <div class="p-5 overflow-y-auto space-y-6 text-sm text-slate-300 flex-1">
-                
-                <!-- 賽事基本架構設定 -->
+
+                <!-- 賽事基本架構設定 (已上移至最頂部) -->
                 <div class="bg-slate-950/50 p-4 rounded-2xl border border-slate-800/80 space-y-4">
                     <h4 class="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                         <i class="fa-solid fa-gear"></i> 賽制與規模設定
@@ -338,6 +339,30 @@
                         <span id="seedCalcDetail">
                             滿席 32 籤位，32 人無輪空。
                         </span>
+                    </div>
+                </div>
+
+                <!-- 專屬於後台的即時比賽分數輸入與裁判裁決專區 (已排在賽制設定下方) -->
+                <div class="bg-gradient-to-br from-slate-900 to-amber-950/30 p-4 rounded-2xl border border-amber-500/40 space-y-3 shadow-lg">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fa-solid fa-gavel"></i> 即時比賽比分輸入與勝負裁決
+                        </h4>
+                        <span class="text-[10px] text-slate-400">僅後台可裁定推進</span>
+                    </div>
+
+                    <p class="text-xs text-slate-400 leading-tight">
+                        請選擇輪次，輸入局數分數並點選裁定勝者，系統將自動保送晉級至下一輪：
+                    </p>
+
+                    <!-- 後台輪次快速切換 -->
+                    <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1" id="adminRoundFilterBar">
+                        <!-- 動態生成後台專用輪次按鈕 -->
+                    </div>
+
+                    <!-- 後台可輸入分數與裁決的對戰清單 -->
+                    <div class="space-y-2.5 max-h-[320px] overflow-y-auto no-scrollbar pt-1" id="adminMatchScoringList">
+                        <!-- 動態生成每場的對決輸入項 -->
                     </div>
                 </div>
 
@@ -593,12 +618,16 @@
                 // 檢查是否有一方是 BYE 保送
                 let winner = null;
                 let status = 'pending';
+                let score1 = 0;
+                let score2 = 0;
                 if (p1 && p1.isBye && p2 && !p2.isBye) {
                     winner = p2;
                     status = 'completed';
+                    score2 = 1;
                 } else if (p2 && p2.isBye && p1 && !p1.isBye) {
                     winner = p1;
                     status = 'completed';
+                    score1 = 1;
                 }
 
                 round1Matches.push({
@@ -607,6 +636,8 @@
                     matchIndex: round1Matches.length,
                     player1: p1,
                     player2: p2,
+                    score1: score1,
+                    score2: score2,
                     winner: winner,
                     status: status,
                     stadiumIndex: (matchCounter - 1) % state.stadiums.length
@@ -635,6 +666,8 @@
                         matchIndex: m,
                         player1: p1,
                         player2: p2,
+                        score1: 0,
+                        score2: 0,
                         winner: null,
                         status: 'pending',
                         stadiumIndex: m % state.stadiums.length
@@ -788,14 +821,18 @@
                 const isP2Mine = clientUser.name && match.player2 && match.player2.name.includes(clientUser.name);
                 const isMyMatch = isP1Mine || isP2Mine;
 
+                // 參賽者畫面完全純展示，不具備可點擊裁判判決屬性
                 card.className = `beyblade-card rounded-2xl p-4 transition-all duration-200 relative ${
                     isMyMatch ? 'active-match ring-2 ring-amber-400' : ''
-                } ${isAdminUnlocked ? 'cursor-pointer hover:border-amber-400/80 active:scale-[0.99]' : ''}`;
+                }`;
 
                 const p1Name = match.player1 ? match.player1.name : '等待晉級者...';
                 const p2Name = match.player2 ? match.player2.name : '等待晉級者...';
                 const isP1Winner = match.winner && match.player1 && match.winner.id === match.player1.id;
                 const isP2Winner = match.winner && match.player2 && match.winner.id === match.player2.id;
+                const s1 = match.score1 !== undefined ? match.score1 : 0;
+                const s2 = match.score2 !== undefined ? match.score2 : 0;
+                const hasScore = match.status === 'completed' || s1 > 0 || s2 > 0;
 
                 card.innerHTML = `
                     <div class="flex items-center justify-between text-xs border-b border-slate-800/80 pb-2 mb-3">
@@ -806,7 +843,7 @@
                             <span class="text-[11px] font-mono text-slate-400">${match.id}</span>
                         </div>
                         ${isMyMatch ? '<span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 animate-pulse">🔥 我的對戰</span>' : ''}
-                        ${isAdminUnlocked ? '<span class="text-[10px] font-bold text-amber-400 hover:underline flex items-center gap-1"><i class="fa-solid fa-gavel"></i> 裁判判決</span>' : ''}
+                        ${match.status === 'completed' ? '<span class="text-[10px] font-semibold text-emerald-400 px-2 py-0.5 rounded bg-emerald-950/40 border border-emerald-800/50">已完賽</span>' : '<span class="text-[10px] font-semibold text-slate-500">對局進行中</span>'}
                     </div>
 
                     <!-- 選手 1 -->
@@ -815,7 +852,10 @@
                             <span class="w-2.5 h-2.5 rounded-full ${match.player1 && match.player1.isBye ? 'bg-slate-600' : 'bg-red-500'} shrink-0"></span>
                             <span class="font-semibold text-xs sm:text-sm truncate ${isP1Winner ? 'font-black text-amber-300' : ''}">${p1Name}</span>
                         </div>
-                        ${isP1Winner ? '<span class="text-[11px] font-black text-amber-400 px-2 py-0.5 rounded bg-amber-950/60 border border-amber-500/50">獲勝 WIN</span>' : ''}
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            ${hasScore ? `<span class="text-xs font-mono font-black px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-200">${s1}</span>` : ''}
+                            ${isP1Winner ? '<span class="text-[11px] font-black text-amber-400 px-2 py-0.5 rounded bg-amber-950/60 border border-amber-500/50">獲勝</span>' : ''}
+                        </div>
                     </div>
 
                     <!-- 選手 2 -->
@@ -824,14 +864,12 @@
                             <span class="w-2.5 h-2.5 rounded-full ${match.player2 && match.player2.isBye ? 'bg-slate-600' : 'bg-cyan-500'} shrink-0"></span>
                             <span class="font-semibold text-xs sm:text-sm truncate ${isP2Winner ? 'font-black text-cyan-300' : ''}">${p2Name}</span>
                         </div>
-                        ${isP2Winner ? '<span class="text-[11px] font-black text-cyan-400 px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-500/50">獲勝 WIN</span>' : ''}
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            ${hasScore ? `<span class="text-xs font-mono font-black px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-200">${s2}</span>` : ''}
+                            ${isP2Winner ? '<span class="text-[11px] font-black text-cyan-400 px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-500/50">獲勝</span>' : ''}
+                        </div>
                     </div>
                 `;
-
-                // 若主辦方已解鎖，點擊可開啟判決視窗
-                if (isAdminUnlocked) {
-                    card.onclick = () => openMatchScoreModal(match);
-                }
 
                 container.appendChild(card);
             });
@@ -863,29 +901,170 @@
                     const p2Name = match.player2 ? match.player2.name : 'TBD';
                     const p1Win = match.winner && match.player1 && match.winner.id === match.player1.id;
                     const p2Win = match.winner && match.player2 && match.winner.id === match.player2.id;
+                    const s1 = match.score1 !== undefined ? match.score1 : 0;
+                    const s2 = match.score2 !== undefined ? match.score2 : 0;
 
                     mBox.innerHTML = `
                         <div class="text-[10px] text-slate-500 flex justify-between">
                             <span>${state.stadiums[match.stadiumIndex % state.stadiums.length]}</span>
                             <span>${match.id}</span>
                         </div>
-                        <div class="text-xs truncate px-2 py-1 rounded ${p1Win ? 'bg-amber-500/20 text-amber-300 font-bold' : 'bg-slate-950 text-slate-300'}">
-                            ${p1Name}
+                        <div class="text-xs truncate px-2 py-1 rounded flex justify-between items-center ${p1Win ? 'bg-amber-500/20 text-amber-300 font-bold' : 'bg-slate-950 text-slate-300'}">
+                            <span class="truncate">${p1Name}</span>
+                            ${match.status === 'completed' ? `<span class="font-mono text-[11px] ml-1 font-bold">${s1}</span>` : ''}
                         </div>
-                        <div class="text-xs truncate px-2 py-1 rounded ${p2Win ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'bg-slate-950 text-slate-300'}">
-                            ${p2Name}
+                        <div class="text-xs truncate px-2 py-1 rounded flex justify-between items-center ${p2Win ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'bg-slate-950 text-slate-300'}">
+                            <span class="truncate">${p2Name}</span>
+                            ${match.status === 'completed' ? `<span class="font-mono text-[11px] ml-1 font-bold">${s2}</span>` : ''}
                         </div>
                     `;
-
-                    if (isAdminUnlocked) {
-                        mBox.classList.add('cursor-pointer', 'hover:border-amber-400');
-                        mBox.onclick = () => openMatchScoreModal(match);
-                    }
 
                     col.appendChild(mBox);
                 });
 
                 container.appendChild(col);
+            });
+        }
+
+        /* 後台專用：即時比分輸入與裁決列表渲染 */
+        let adminSelectedRoundIdx = 0;
+
+        function renderAdminScoringPanel() {
+            const filterBar = document.getElementById('adminRoundFilterBar');
+            const scoringList = document.getElementById('adminMatchScoringList');
+            if (!filterBar || !scoringList) return;
+
+            filterBar.innerHTML = '';
+            scoringList.innerHTML = '';
+
+            const roundsList = state.matches.winner;
+            if (!roundsList || roundsList.length === 0) {
+                scoringList.innerHTML = `<div class="text-center py-4 text-xs text-slate-500">暫無對戰資料，請先在下方點擊抽籤生成賽程。</div>`;
+                return;
+            }
+
+            // 確保選取的輪次在範圍內
+            if (adminSelectedRoundIdx >= roundsList.length) {
+                adminSelectedRoundIdx = 0;
+            }
+
+            // 輪次按鈕
+            roundsList.forEach((roundMatches, idx) => {
+                const btn = document.createElement('button');
+                const isSelected = adminSelectedRoundIdx === idx;
+                btn.className = `px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
+                    isSelected ? 'bg-amber-400 text-slate-950 shadow-sm' : 'bg-slate-800 text-slate-300 hover:text-white'
+                }`;
+                btn.innerText = getRoundName(idx, roundsList.length);
+                btn.onclick = () => {
+                    adminSelectedRoundIdx = idx;
+                    renderAdminScoringPanel();
+                };
+                filterBar.appendChild(btn);
+            });
+
+            // 該輪次各局比分輸入卡
+            const matchesInRound = roundsList[adminSelectedRoundIdx] || [];
+            matchesInRound.forEach((match) => {
+                const matchRow = document.createElement('div');
+                const stadiumName = state.stadiums[match.stadiumIndex % state.stadiums.length] || '戰鬥盤';
+                const p1 = match.player1;
+                const p2 = match.player2;
+                const p1Name = p1 ? p1.name : '等待中';
+                const p2Name = p2 ? p2.name : '等待中';
+                const s1 = match.score1 !== undefined ? match.score1 : 0;
+                const s2 = match.score2 !== undefined ? match.score2 : 0;
+                const isP1Win = match.winner && p1 && match.winner.id === p1.id;
+                const isP2Win = match.winner && p2 && match.winner.id === p2.id;
+                const canScore = p1 && p2 && !p1.isBye && !p2.isBye;
+
+                matchRow.className = `p-3 rounded-xl border bg-slate-950/70 ${match.status === 'completed' ? 'border-emerald-700/60' : 'border-slate-800'} space-y-2`;
+
+                matchRow.innerHTML = `
+                    <div class="flex items-center justify-between text-[11px] text-slate-400">
+                        <span class="font-bold text-amber-300"><i class="fa-solid fa-gamepad mr-1"></i>${match.id} (${stadiumName})</span>
+                        <span class="${match.status === 'completed' ? 'text-emerald-400 font-bold' : 'text-slate-500'}">
+                            ${match.status === 'completed' ? '● 已裁決勝負' : '○ 待裁決'}
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-5 gap-2 items-center text-xs">
+                        <!-- 選手1 名稱與比分 -->
+                        <div class="col-span-2 flex items-center gap-1.5 min-w-0">
+                            <span class="w-2 h-2 rounded-full ${p1 && p1.isBye ? 'bg-slate-600' : 'bg-red-500'} shrink-0"></span>
+                            <span class="truncate font-semibold ${isP1Win ? 'text-amber-300 font-bold' : 'text-slate-200'}">${p1Name}</span>
+                        </div>
+                        
+                        <!-- 比分輸入區 -->
+                        <div class="col-span-1 flex items-center justify-center gap-1">
+                            <input type="number" min="0" max="99" value="${s1}" id="score1_${match.id}" 
+                                   class="w-7 h-7 text-center font-mono font-bold bg-slate-900 border border-slate-700 rounded text-white text-xs outline-none focus:border-amber-400"
+                                   ${!canScore ? 'disabled' : ''}>
+                            <span class="text-slate-500 text-xs">:</span>
+                            <input type="number" min="0" max="99" value="${s2}" id="score2_${match.id}" 
+                                   class="w-7 h-7 text-center font-mono font-bold bg-slate-900 border border-slate-700 rounded text-white text-xs outline-none focus:border-amber-400"
+                                   ${!canScore ? 'disabled' : ''}>
+                        </div>
+
+                        <!-- 選手2 名稱 -->
+                        <div class="col-span-2 flex items-center justify-end gap-1.5 min-w-0">
+                            <span class="truncate font-semibold text-right ${isP2Win ? 'text-cyan-300 font-bold' : 'text-slate-200'}">${p2Name}</span>
+                            <span class="w-2 h-2 rounded-full ${p2 && p2.isBye ? 'bg-slate-600' : 'bg-cyan-500'} shrink-0"></span>
+                        </div>
+                    </div>
+
+                    <!-- 裁判判決操作按鈕群 -->
+                    <div class="flex items-center gap-2 pt-1 border-t border-slate-900 text-xs">
+                        <button class="btn-judge-p1 flex-1 py-1 px-2 rounded-lg bg-red-950/60 hover:bg-red-900 border border-red-700/50 text-red-200 font-bold text-[11px] transition-colors disabled:opacity-30"
+                                ${!canScore ? 'disabled' : ''}>
+                            裁定紅方勝出
+                        </button>
+                        <button class="btn-judge-p2 flex-1 py-1 px-2 rounded-lg bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-700/50 text-cyan-200 font-bold text-[11px] transition-colors disabled:opacity-30"
+                                ${!canScore ? 'disabled' : ''}>
+                            裁定藍方勝出
+                        </button>
+                        <button class="btn-judge-reset px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 text-[11px] font-bold"
+                                ${!match.winner ? 'disabled' : ''}>
+                            重置
+                        </button>
+                    </div>
+                `;
+
+                // 綁定按鈕動作
+                const btnP1 = matchRow.querySelector('.btn-judge-p1');
+                const btnP2 = matchRow.querySelector('.btn-judge-p2');
+                const btnReset = matchRow.querySelector('.btn-judge-reset');
+
+                if (btnP1) {
+                    btnP1.onclick = () => {
+                        const inputS1 = parseInt(document.getElementById(`score1_${match.id}`).value, 10) || 0;
+                        const inputS2 = parseInt(document.getElementById(`score2_${match.id}`).value, 10) || 0;
+                        match.score1 = Math.max(inputS1, 1);
+                        match.score2 = inputS2;
+                        setMatchWinner(match, p1);
+                        renderAdminScoringPanel();
+                    };
+                }
+
+                if (btnP2) {
+                    btnP2.onclick = () => {
+                        const inputS1 = parseInt(document.getElementById(`score1_${match.id}`).value, 10) || 0;
+                        const inputS2 = parseInt(document.getElementById(`score2_${match.id}`).value, 10) || 0;
+                        match.score1 = inputS1;
+                        match.score2 = Math.max(inputS2, 1);
+                        setMatchWinner(match, p2);
+                        renderAdminScoringPanel();
+                    };
+                }
+
+                if (btnReset) {
+                    btnReset.onclick = () => {
+                        resetSingleMatchDirect(match);
+                        renderAdminScoringPanel();
+                    };
+                }
+
+                scoringList.appendChild(matchRow);
             });
         }
 
@@ -924,19 +1103,20 @@
                 const stadium = state.stadiums[foundMatch.stadiumIndex % state.stadiums.length];
                 const isP1 = foundMatch.player1 && foundMatch.player1.name.includes(clientUser.name);
                 const opponent = isP1 ? (foundMatch.player2 ? foundMatch.player2.name : '對手尚未確定') : (foundMatch.player1 ? foundMatch.player1.name : '對手尚未確定');
+                const roundName = getRoundName(foundRoundIdx, rounds.length);
 
                 if (foundMatch.status === 'completed') {
                     if (foundMatch.winner && foundMatch.winner.name.includes(clientUser.name)) {
-                        nextMatchText.innerText = `恭喜晉級下一輪！等待排定最新桌號...`;
+                        nextMatchText.innerText = `恭喜於【${roundName}】獲勝！等待裁判排定最新下一輪桌號...`;
                         statusBadge.className = 'text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-400/30';
                         statusBadge.innerText = '已晉級 (WIN)';
                     } else {
-                        nextMatchText.innerText = `本屆賽程已止步，感謝熱情參戰！`;
+                        nextMatchText.innerText = `於【${roundName}】止步，感謝熱情參戰！`;
                         statusBadge.className = 'text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 border border-slate-700';
                         statusBadge.innerText = '已淘汰';
                     }
                 } else {
-                    nextMatchText.innerText = `${stadium} · 對戰：VS ${opponent}`;
+                    nextMatchText.innerText = `【${roundName}】${stadium} · 對抗對手：VS ${opponent}`;
                     statusBadge.className = 'text-xs font-bold px-2.5 py-1 rounded-lg bg-amber-400/20 text-amber-300 border border-amber-400/30';
                     statusBadge.innerText = '備戰中 / 即將出賽';
                 }
@@ -946,45 +1126,20 @@
             }
         }
 
-        let activeModalMatch = null;
+        function setMatchWinner(targetMatch, winnerPlayer) {
+            if (!targetMatch || !winnerPlayer) return;
 
-        function openMatchScoreModal(match) {
-            if (!isAdminUnlocked) return;
-            activeModalMatch = match;
-
-            const modal = document.getElementById('matchScoreModal');
-            document.getElementById('modalMatchTitle').innerText = `裁判裁決 — ${match.id}`;
-            document.getElementById('modalMatchStadium').innerText = `分配場地：${state.stadiums[match.stadiumIndex % state.stadiums.length]}`;
-
-            const p1Btn = document.getElementById('btnSelectP1');
-            const p2Btn = document.getElementById('btnSelectP2');
-            const p1NameElem = document.getElementById('modalP1Name');
-            const p2NameElem = document.getElementById('modalP2Name');
-
-            p1NameElem.innerText = match.player1 ? match.player1.name : '— 空缺 —';
-            p2NameElem.innerText = match.player2 ? match.player2.name : '— 空缺 —';
-
-            p1Btn.disabled = !match.player1 || match.player1.isBye;
-            p2Btn.disabled = !match.player2 || match.player2.isBye;
-
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
-
-        function setMatchWinner(winnerPlayer) {
-            if (!activeModalMatch || !winnerPlayer) return;
-
-            activeModalMatch.winner = winnerPlayer;
-            activeModalMatch.status = 'completed';
+            targetMatch.winner = winnerPlayer;
+            targetMatch.status = 'completed';
 
             // 音效與煙火
             SoundFX.playWin();
 
             // 自動推進至下一輪對應槽位
-            advanceWinnerToNextRound(activeModalMatch, winnerPlayer);
+            advanceWinnerToNextRound(targetMatch, winnerPlayer);
 
             // 若為決賽最後一場，觸發全場勝利彩帶
-            const isFinalMatch = activeModalMatch.roundIndex === state.matches.winner.length - 1;
+            const isFinalMatch = targetMatch.roundIndex === state.matches.winner.length - 1;
             if (isFinalMatch) {
                 confetti({
                     particleCount: 150,
@@ -997,7 +1152,6 @@
             }
 
             saveStateToStorage();
-            closeMatchScoreModal();
             renderMatchCards();
             renderBracketTree();
         }
@@ -1019,37 +1173,33 @@
             }
         }
 
-        function resetSingleMatch() {
-            if (!activeModalMatch) return;
-            activeModalMatch.winner = null;
-            activeModalMatch.status = 'pending';
+        function resetSingleMatchDirect(targetMatch) {
+            if (!targetMatch) return;
+            targetMatch.winner = null;
+            targetMatch.status = 'pending';
+            targetMatch.score1 = 0;
+            targetMatch.score2 = 0;
 
             // 同步清空下一輪對應槽位
-            const nextRoundIdx = activeModalMatch.roundIndex + 1;
+            const nextRoundIdx = targetMatch.roundIndex + 1;
             if (nextRoundIdx < state.matches.winner.length) {
-                const nextMatchIdx = Math.floor(activeModalMatch.matchIndex / 2);
-                const isFirstSlot = activeModalMatch.matchIndex % 2 === 0;
+                const nextMatchIdx = Math.floor(targetMatch.matchIndex / 2);
+                const isFirstSlot = targetMatch.matchIndex % 2 === 0;
                 const nextMatch = state.matches.winner[nextRoundIdx][nextMatchIdx];
                 if (nextMatch) {
                     if (isFirstSlot) nextMatch.player1 = null;
                     else nextMatch.player2 = null;
                     nextMatch.winner = null;
                     nextMatch.status = 'pending';
+                    nextMatch.score1 = 0;
+                    nextMatch.score2 = 0;
                 }
             }
 
             saveStateToStorage();
-            closeMatchScoreModal();
             renderMatchCards();
             renderBracketTree();
             showToast('已重置該場次結果', 'fa-rotate-left');
-        }
-
-        function closeMatchScoreModal() {
-            const modal = document.getElementById('matchScoreModal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-            activeModalMatch = null;
         }
 
         function saveStateToStorage() {
@@ -1167,25 +1317,13 @@
                 document.getElementById('checkinScreen').classList.remove('hidden');
             });
 
-            // 3. 隱蔽後台密碼觸發機制
-            // 機制 A：LOGO 快速點擊 5 次 (手機端最直覺防呆密技)
-            let logoClickCount = 0;
-            let logoClickTimer = null;
-            document.getElementById('arenaLogoTrigger').addEventListener('click', () => {
-                logoClickCount++;
-                clearTimeout(logoClickTimer);
-                logoClickTimer = setTimeout(() => { logoClickCount = 0; }, 1800);
-
-                if (logoClickCount >= 5) {
-                    logoClickCount = 0;
+            // 3. 輸入名字畫面上的「BEYBLADE ARENA 上方圖示」點擊進入後台密碼驗證
+            const btnCheckinAdminIcon = document.getElementById('btnCheckinAdminIcon');
+            if (btnCheckinAdminIcon) {
+                btnCheckinAdminIcon.addEventListener('click', () => {
                     openPasswordModal();
-                }
-            });
-
-            // 機制 B：頁尾的小圓點點擊 (備用隱形按鈕)
-            document.getElementById('secretDotTrigger').addEventListener('click', () => {
-                openPasswordModal();
-            });
+                });
+            }
 
             function openPasswordModal() {
                 document.getElementById('adminPasswordInput').value = '';
@@ -1207,9 +1345,10 @@
                     isAdminUnlocked = true;
                     document.getElementById('adminPasswordModal').classList.add('hidden');
                     document.getElementById('adminPasswordModal').classList.remove('flex');
-                    showToast('主辦方權限已解鎖！點擊對戰卡片可裁決比分。', 'fa-unlock');
+                    // 自動關閉選手簽到遮罩，讓主辦方能直接檢視與操作完整賽程
+                    document.getElementById('checkinScreen').classList.add('hidden');
+                    showToast('主辦方權限已解鎖！請於總控台中輸入各場比分與裁決。', 'fa-unlock');
                     openAdminDrawer();
-                    renderMatchCards();
                 } else {
                     showToast('管理密碼錯誤，請重新輸入！', 'fa-circle-xmark');
                 }
@@ -1222,6 +1361,7 @@
                 document.getElementById('playerListInput').value = state.players.map(p => p.name).join('\n');
                 document.getElementById('stadiumsConfigInput').value = state.stadiums.join(', ');
                 updateSeedCalcDisplay();
+                renderAdminScoringPanel();
 
                 document.getElementById('adminDrawer').classList.remove('hidden');
                 document.getElementById('adminDrawer').classList.add('flex');
@@ -1296,6 +1436,7 @@
                 renderRoundTabs();
                 renderMatchCards();
                 renderBracketTree();
+                renderAdminScoringPanel();
                 document.getElementById('adminDrawer').classList.add('hidden');
                 document.getElementById('adminDrawer').classList.remove('flex');
                 showToast('🎉 隨機籤位生成成功！賽程已全面更新。', 'fa-dice');
@@ -1311,6 +1452,7 @@
                 renderRoundTabs();
                 renderMatchCards();
                 renderBracketTree();
+                renderAdminScoringPanel();
                 showToast('所有場次結果已清空重設', 'fa-rotate-left');
             });
 
@@ -1325,21 +1467,6 @@
                 document.getElementById('newAdminPasswordInput').value = '';
                 showToast('後台管理密碼已成功變更！', 'fa-key');
             });
-
-            // 6. 裁判裁決彈窗按鈕
-            document.getElementById('btnSelectP1').addEventListener('click', () => {
-                if (activeModalMatch && activeModalMatch.player1) {
-                    setMatchWinner(activeModalMatch.player1);
-                }
-            });
-            document.getElementById('btnSelectP2').addEventListener('click', () => {
-                if (activeModalMatch && activeModalMatch.player2) {
-                    setMatchWinner(activeModalMatch.player2);
-                }
-            });
-            document.getElementById('btnResetSingleMatch').addEventListener('click', resetSingleMatch);
-            document.getElementById('btnCloseScoreModal').addEventListener('click', closeMatchScoreModal);
-            document.getElementById('btnCancelMatchModal').addEventListener('click', closeMatchScoreModal);
 
             // 7. 輪次卡片視圖 vs 樹狀圖切換
             document.getElementById('tabRoundCards').addEventListener('click', () => {
