@@ -381,7 +381,8 @@
          * 常數與儲存
          * ============================================================ */
         const APP_STORAGE_KEY = 'BEYBLADE_TOURNAMENT_V3_STATE';   // V3：資料結構改為以 id 引用選手，舊版資料不相容
-        const APP_PASS_KEY = 'BEYBLADE_ADMIN_PASS';
+        const APP_PASS_KEY = 'BEYBLADE_ADMIN_PASS_V2';      // 換新鍵名：舊版存過的密碼自動失效，回到預設密碼
+        const OLD_PASS_KEYS = ['BEYBLADE_ADMIN_PASS'];
         const MY_NAME_KEY = 'BEYBLADE_MY_NAME';
         const MY_ID_KEY = 'BEYBLADE_MY_ID';
         const DEFAULT_ADMIN_PASS = '184179';
@@ -392,7 +393,8 @@
         // localStorage 可能被禁用（無痕模式、file:// 等），一律包 try/catch
         const store = {
             get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
-            set(k, v) { try { localStorage.setItem(k, v); } catch (e) { console.error('Storage error:', e); } }
+            set(k, v) { try { localStorage.setItem(k, v); } catch (e) { console.error('Storage error:', e); } },
+            remove(k) { try { localStorage.removeItem(k); } catch (e) { /* ignore */ } }
         };
 
         /*
@@ -1371,6 +1373,7 @@
         }
 
         window.addEventListener('DOMContentLoaded', () => {
+            OLD_PASS_KEYS.forEach(k => store.remove(k));   // 清掉舊版儲存的密碼
             loadIdentity();
             if (!loadState()) {
                 state.players = generateDefaultPlayers(32, true);
