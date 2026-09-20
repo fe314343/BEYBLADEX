@@ -216,6 +216,28 @@
         </div>
     </div>
 
+    <!-- 通用確認視窗（用於危險操作，例如重置比賽） -->
+    <div id="confirmModal" class="fixed inset-0 z-[58] bg-black/85 backdrop-blur-md hidden items-center justify-center px-4" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+        <div class="bg-arena-card border border-red-500/50 w-full max-w-sm rounded-2xl p-6 shadow-neon-red">
+            <div class="text-center">
+                <div class="w-14 h-14 rounded-full bg-red-500/15 border border-red-500/50 text-red-400 mx-auto flex items-center justify-center text-2xl mb-3">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h3 id="confirmTitle" class="text-lg font-black text-white">確認操作</h3>
+                <p id="confirmMessage" class="text-sm text-slate-300 mt-2 leading-relaxed"></p>
+            </div>
+            <div id="confirmDetail" class="hidden mt-3 p-3 rounded-xl bg-red-950/40 border border-red-800/50 text-xs text-red-200 leading-relaxed"></div>
+            <label id="confirmCheckWrap" class="hidden mt-4 flex items-start gap-2 text-xs text-slate-200 cursor-pointer">
+                <input type="checkbox" id="confirmCheck" class="accent-red-500 w-4 h-4 mt-0.5 shrink-0">
+                <span id="confirmCheckText"></span>
+            </label>
+            <div class="flex gap-2.5 mt-5">
+                <button id="confirmCancel" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold text-sm border border-slate-700">取消，返回</button>
+                <button id="confirmOk" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-600">確定</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 主辦方管理控制面板 -->
     <div id="adminDrawer" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex-col justify-end sm:justify-center items-center p-0 sm:p-4">
         <div class="bg-slate-900 border border-slate-700 w-full sm:max-w-2xl max-h-[92vh] rounded-t-3xl sm:rounded-3xl flex flex-col shadow-2xl overflow-hidden">
@@ -301,9 +323,6 @@
                             <i class="fa-solid fa-diagram-project"></i>
                             <span>建立賽程表</span>
                         </button>
-                        <button id="btnResetBracket" class="px-4 py-2.5 bg-red-950/60 hover:bg-red-900 border border-red-700/60 text-red-300 font-bold rounded-xl text-xs">
-                            重置所有比分
-                        </button>
                     </div>
 
                     <div class="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3 border-t border-slate-800">
@@ -340,6 +359,19 @@
                     <input type="text" id="stadiumsConfigInput" value="陀螺戰鬥盤 A, 陀螺戰鬥盤 B, 陀螺戰鬥盤 C, 陀螺決賽中央盤"
                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs outline-none focus:border-amber-400">
                     <p class="text-[11px] text-slate-500">以逗號分隔（中英文逗號皆可）。最後一個為決賽專用盤，其餘依序輪流指派；需按「建立賽程表」才會重新指派。</p>
+                </div>
+
+                <!-- 危險操作：與常用按鈕分開放置，避免誤觸 -->
+                <div class="bg-red-950/20 p-4 rounded-2xl border border-red-800/50 space-y-3">
+                    <h4 class="text-xs font-black text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-triangle-exclamation"></i> 危險操作
+                    </h4>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">
+                        重置比賽會清除所有比分與晉級結果（選手名單與籤位順序會保留）。按下後會先跳出確認視窗，需再次確認才會執行。
+                    </p>
+                    <button id="btnResetBracket" class="w-full py-2.5 bg-red-950/60 hover:bg-red-900 border border-red-700/60 text-red-300 font-black rounded-xl text-xs tracking-wider flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-rotate-left"></i><span>重置比賽</span>
+                    </button>
                 </div>
 
                 <div class="pt-2 pb-1">
@@ -1343,6 +1375,41 @@
         }
 
         /* ============================================================
+         * 通用確認視窗（取代瀏覽器內建 confirm，防止誤觸）
+         * ============================================================ */
+        let confirmResolver = null;
+
+        function askConfirm({ title, message, detailHTML = '', checkText = '', okText = '確定', cancelText = '取消，返回' }) {
+            return new Promise(resolve => {
+                if (confirmResolver) confirmResolver(false);
+                confirmResolver = resolve;
+                $('confirmTitle').innerText = title;
+                $('confirmMessage').innerText = message;
+                const detail = $('confirmDetail');
+                detail.innerHTML = detailHTML;
+                detail.classList.toggle('hidden', !detailHTML);
+                $('confirmCheckText').innerText = checkText;
+                $('confirmCheckWrap').classList.toggle('hidden', !checkText);
+                $('confirmCheckWrap').classList.toggle('flex', !!checkText);
+                $('confirmCheck').checked = false;
+                $('confirmOk').disabled = !!checkText;          // 需先勾選確認才能按「確定」
+                $('confirmOk').innerText = okText;
+                $('confirmCancel').innerText = cancelText;
+                $('confirmModal').classList.remove('hidden');
+                $('confirmModal').classList.add('flex');
+                $('confirmCancel').focus();                     // 預設焦點在「取消」，按 Enter 也不會誤觸
+            });
+        }
+
+        function closeConfirm(result) {
+            $('confirmModal').classList.add('hidden');
+            $('confirmModal').classList.remove('flex');
+            const r = confirmResolver;
+            confirmResolver = null;
+            if (r) r(result);
+        }
+
+        /* ============================================================
          * 後台驗證
          * ============================================================ */
         function openPasswordModal() {
@@ -1470,15 +1537,38 @@
             $('btnCreateBracket').addEventListener('click', createBracketFromForm);
             $('btnPrintBracket').addEventListener('click', printBracket);
 
-            $('btnResetBracket').addEventListener('click', () => {
+            // --- 確認視窗 ---
+            $('confirmCancel').addEventListener('click', () => closeConfirm(false));
+            $('confirmOk').addEventListener('click', () => { if (!$('confirmOk').disabled) closeConfirm(true); });
+            $('confirmCheck').addEventListener('change', e => { $('confirmOk').disabled = !e.target.checked; });
+            $('confirmModal').addEventListener('click', e => { if (e.target === $('confirmModal')) closeConfirm(false); });
+            document.addEventListener('keydown', e => {
+                if (e.key === 'Escape' && !$('confirmModal').classList.contains('hidden')) closeConfirm(false);
+            });
+
+            // --- 重置比賽（先跳出確認視窗，避免誤觸）---
+            $('btnResetBracket').addEventListener('click', async () => {
                 if (!state.rounds.length) { showToast('尚未建立賽程', 'fa-triangle-exclamation'); return; }
-                if (!confirm('確定要清空所有場次的比分與晉級結果嗎？（籤位順序不變）')) return;
+                const played = state.rounds.flat().filter(m => !m.auto && (m.status === 'completed' || m.score1 > 0 || m.score2 > 0));
+                if (!played.length) { showToast('目前沒有任何比賽結果，不需要重置', 'fa-circle-info'); return; }
+                const completed = played.filter(m => m.status === 'completed').length;
+
+                const ok = await askConfirm({
+                    title: '確定要重置比賽嗎？',
+                    message: '重置後，所有場次的比分與晉級結果都會被清空，賽程會回到尚未開賽的狀態。',
+                    detailHTML: `目前已完成 <strong>${completed}</strong> 場、有比分紀錄共 <strong>${played.length}</strong> 場。<br>選手名單與籤位順序會保留。<br><strong>此動作無法復原，所有觀眾的畫面也會同步被清空。</strong>`,
+                    checkText: '我已了解，確定要清除所有比賽結果',
+                    okText: '確定重置',
+                    cancelText: '取消，返回'
+                });
+                if (!ok) return;
+
                 rebuildBracket();
                 saveState();
                 currentRoundTab = pickDefaultRound();
                 renderAll();
                 renderAdminScoringPanel();
-                showToast('所有場次結果已清空重設', 'fa-rotate-left');
+                showToast('比賽已重置，所有比分與晉級結果已清空', 'fa-rotate-left');
             });
 
             // --- 檢視切換 ---
