@@ -1402,16 +1402,25 @@
                 $('checkinScreen').classList.remove('hidden');
             });
 
-            // --- 後台入口 ---
-            $('btnCheckinAdminIcon').addEventListener('click', openPasswordModal);
-            let logoClicks = 0, logoTimer = null;
-            $('arenaLogoTrigger').addEventListener('click', () => {
-                logoClicks++;
-                if (logoTimer) clearTimeout(logoTimer);
-                logoTimer = setTimeout(() => { logoClicks = 0; }, 1500);
-                if (logoClicks >= 5) { logoClicks = 0; openPasswordModal(); }
-            });
-            $('secretDotTrigger').addEventListener('click', openPasswordModal);
+            // --- 後台入口：連續點擊 5 次（每次間隔不超過 1.5 秒）才會跳出密碼視窗 ---
+            const ADMIN_CLICKS_REQUIRED = 5;
+            const ADMIN_CLICK_WINDOW_MS = 1500;
+            function bindAdminEntry(el) {
+                let count = 0, timer = null;
+                el.addEventListener('click', () => {
+                    count++;
+                    if (timer) clearTimeout(timer);
+                    timer = setTimeout(() => { count = 0; }, ADMIN_CLICK_WINDOW_MS);
+                    if (count >= ADMIN_CLICKS_REQUIRED) {
+                        count = 0;
+                        clearTimeout(timer);
+                        openPasswordModal();
+                    }
+                });
+            }
+            bindAdminEntry($('btnCheckinAdminIcon'));
+            bindAdminEntry($('arenaLogoTrigger'));
+            bindAdminEntry($('secretDotTrigger'));
             $('btnClosePassModal').addEventListener('click', closePasswordModal);
             $('btnVerifyPassword').addEventListener('click', submitPassword);
             $('adminPasswordInput').addEventListener('keydown', e => { if (e.key === 'Enter') submitPassword(); });
