@@ -56,6 +56,55 @@
         .tvert-down { top: 50%; bottom: 0; }
         .tvert-up { top: 0; height: 50%; }
 
+
+        /* ================= 列印：裁判紀錄用賽程表 ================= */
+        #printRoot { display: none; }
+        @media print {
+            @page { size: A4 landscape; margin: 8mm; }
+            html, body { background: #fff !important; color: #000 !important; overflow: visible !important; }
+            body > *:not(#printRoot) { display: none !important; }
+            #printRoot { display: block !important; }
+            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+        .pr-page { width: 281mm; height: 190mm; position: relative; box-sizing: border-box; overflow: hidden;
+                   page-break-after: always; break-after: page; color: #000; background: #fff;
+                   font-family: 'Noto Sans TC', 'Chakra Petch', sans-serif; }
+        .pr-page:last-child { page-break-after: auto; break-after: auto; }
+        .pr-head { height: 12mm; box-sizing: border-box; display: flex; justify-content: space-between; align-items: flex-end;
+                   border-bottom: 0.5mm solid #000; padding-bottom: 1.5mm; }
+        .pr-title { font-size: 15pt; font-weight: 900; letter-spacing: 0.5pt; }
+        .pr-sub { font-size: 9pt; font-weight: 700; margin-left: 3mm; }
+        .pr-meta { font-size: 8pt; text-align: right; line-height: 1.3; }
+        .pr-tree { position: absolute; top: 15mm; left: 0; right: 0; bottom: 10mm; display: flex; gap: 6mm; }
+        .pr-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
+        .pr-colhead { height: 5mm; line-height: 5mm; font-size: 8pt; font-weight: 700; text-align: center; border-bottom: 0.3mm solid #000; }
+        .pr-cells { flex: 1; display: flex; flex-direction: column; }
+        .pr-cell { position: relative; flex: 1 1 0; min-height: 0; display: flex; align-items: center; }
+        .pr-box { width: 100%; display: flex; border: 0.35mm solid #000; background: #fff; box-sizing: border-box; }
+        .pr-id { width: 15mm; flex: none; border-right: 0.3mm solid #000; padding: 0 1mm; box-sizing: border-box;
+                 display: flex; flex-direction: column; justify-content: center; overflow: hidden; background: #eee; }
+        .pr-id b { font-size: 6pt; line-height: 1.2; }
+        .pr-id i { font-style: normal; font-size: 5pt; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pr-rows { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .pr-row { height: 4.6mm; display: flex; align-items: stretch; font-size: 7.5pt; border-bottom: 0.2mm solid #000; }
+        .pr-row:last-child { border-bottom: 0; }
+        .pr-name { flex: 1; min-width: 0; padding: 0 1mm; display: flex; align-items: center; gap: 1mm; }
+        .pr-no { font-family: 'Chakra Petch', monospace; font-size: 6pt; color: #444; flex: none; }
+        .pr-nm { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pr-win .pr-nm { font-weight: 900; text-decoration: underline; }
+        .pr-hint { font-size: 5.5pt; color: #777; white-space: nowrap; }
+        .pr-bye { font-size: 6.5pt; color: #666; }
+        .pr-score { width: 8mm; flex: none; border-left: 0.3mm solid #000; display: flex; align-items: center; justify-content: center;
+                    font-size: 8pt; font-weight: 700; }
+        .pr-stub { position: absolute; top: 50%; width: 3mm; height: 0; border-top: 0.3mm solid #000; }
+        .pr-stub-r { right: -3mm; }
+        .pr-stub-l { left: -3mm; }
+        .pr-vert { position: absolute; right: -3mm; width: 0; border-left: 0.3mm solid #000; }
+        .pr-vert-down { top: 50%; bottom: 0; }
+        .pr-vert-up { top: 0; height: 50%; }
+        .pr-foot { position: absolute; left: 0; right: 0; bottom: 0; height: 7mm; box-sizing: border-box; border-top: 0.3mm solid #000;
+                   padding-top: 1.2mm; display: flex; justify-content: space-between; font-size: 8pt; }
+
         .beyblade-card {
             background: linear-gradient(145deg, #131b2c, #0d121e);
             border: 1px solid #1f2c42;
@@ -256,6 +305,16 @@
                             重置所有比分
                         </button>
                     </div>
+
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3 border-t border-slate-800">
+                        <button id="btnPrintBracket" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-white text-slate-900 font-black text-xs tracking-wider flex items-center gap-2">
+                            <i class="fa-solid fa-print"></i><span>列印賽程樹狀圖（裁判紀錄用）</span>
+                        </button>
+                        <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                            <input type="checkbox" id="printResultsCheck" class="accent-amber-400 w-4 h-4">
+                            <span>帶入目前已有的比分與晉級結果（不勾選＝空白紀錄表）</span>
+                        </label>
+                    </div>
                 </div>
 
                 <!-- 2. 計分 -->
@@ -291,6 +350,8 @@
             </div>
         </div>
     </div>
+
+    <div id="printRoot"></div>
 
     <script>
     (() => {
@@ -1172,6 +1233,115 @@
             showToast('🎉 賽程表已建立完成！', 'fa-dice');
         }
 
+
+        /* ============================================================
+         * 列印：裁判紀錄用賽程樹狀圖（A4 橫向，白底黑字，省墨）
+         * ============================================================ */
+        const PRINT_SECTION_R1 = 16;      // 一頁最多容納的第一輪場次數；超過就分區列印，最後再加一頁決賽階段
+
+        function printSlotHTML(match, side, r, withResults) {
+            const id = side === 1 ? match.p1 : match.p2;
+            const feeder = r > 0 ? state.rounds[r - 1][match.matchIndex * 2 + (side === 1 ? 0 : 1)] : null;
+            // 第一輪一定印名字；之後各輪只有「輪空晉級者」會預先印出，其餘留白給裁判手寫（或勾選帶入結果）
+            const known = r === 0 || withResults || (feeder && feeder.auto);
+            const p = known ? getPlayer(id) : null;
+            const score = (withResults && match.status === 'completed' && !match.auto) ? (side === 1 ? match.score1 : match.score2) : '';
+            const isWin = withResults && match.winner !== null && match.winner === id && !match.auto;
+
+            let nameHTML;
+            if (p && p.isBye) nameHTML = '<span class="pr-bye">— 輪空 —</span>';
+            else if (p) nameHTML = `<span class="pr-no">${pad2(p.id)}</span><span class="pr-nm">${esc(p.name)}</span>`;
+            else nameHTML = feeder ? `<span class="pr-hint">勝者 ${esc(feeder.id)}</span>` : '';
+            return `<div class="pr-row ${isWin ? 'pr-win' : ''}"><div class="pr-name">${nameHTML}</div><div class="pr-score">${score}</div></div>`;
+        }
+
+        function printPageHTML(page, pageNo, pageCount, ctx) {
+            const rounds = state.rounds;
+            let cols = '';
+            const colMax = Math.min(80, Math.floor(265 / (page.rEnd - page.rStart + 1)));   // 欄數少時不要拉得太寬
+            for (let r = page.rStart; r <= page.rEnd; r++) {
+                const [from, to] = page.range(r);
+                const isLast = r === rounds.length - 1;
+                const lastOnPage = r === page.rEnd;
+                let cells = '';
+                for (let m = from; m < to; m++) {
+                    const match = rounds[r][m];
+                    let deco = '';
+                    if (r > page.rStart) deco += '<span class="pr-stub pr-stub-l"></span>';
+                    if (!lastOnPage && !isLast) {
+                        deco += '<span class="pr-stub pr-stub-r"></span>';
+                        deco += (m - from) % 2 === 0 ? '<span class="pr-vert pr-vert-down"></span>' : '<span class="pr-vert pr-vert-up"></span>';
+                    }
+                    cells += `
+                        <div class="pr-cell">
+                            <div class="pr-box">
+                                <div class="pr-id"><b>${esc(match.id)}</b><i>${esc(stadiumName(match))}</i></div>
+                                <div class="pr-rows">
+                                    ${printSlotHTML(match, 1, r, ctx.withResults)}
+                                    ${printSlotHTML(match, 2, r, ctx.withResults)}
+                                </div>
+                            </div>
+                            ${deco}
+                        </div>`;
+                }
+                cols += `<div class="pr-col" style="max-width:${colMax}mm"><div class="pr-colhead">${esc(getRoundName(r, rounds.length).replace(/^[^\p{L}\p{N}]+/u, ''))}</div><div class="pr-cells">${cells}</div></div>`;
+            }
+
+            const isLastPage = pageNo === pageCount;
+            const cid = championId();
+            const champ = isLastPage
+                ? `<span>總冠軍：${ctx.withResults && cid !== null ? '<b>' + esc((getPlayer(cid) || {}).name || '') + '</b>' : '＿＿＿＿＿＿＿＿＿＿＿＿'}</span>`
+                : '<span></span>';
+
+            return `
+                <section class="pr-page">
+                    <div class="pr-head">
+                        <div><span class="pr-title">BEYBLADE CUP 賽程紀錄表</span><span class="pr-sub">${esc(page.title)}</span></div>
+                        <div class="pr-meta">參賽 ${state.playerCount} 人 · 單淘汰 · 籤表 ${state.bracketSize} 席${state.byesCount ? '（輪空 ' + state.byesCount + '）' : ''}<br>列印時間：${esc(ctx.printedAt)}${ctx.withResults ? '（含目前比分）' : '（空白紀錄表）'}</div>
+                    </div>
+                    <div class="pr-tree">${cols}</div>
+                    <div class="pr-foot">
+                        <span>裁判簽名：＿＿＿＿＿＿＿＿＿＿　　日期／時間：＿＿＿＿＿＿＿＿＿＿</span>
+                        ${champ}
+                        <span>第 ${pageNo} / ${pageCount} 頁</span>
+                    </div>
+                </section>`;
+        }
+
+        function buildPrintSheet(withResults) {
+            const rounds = state.rounds;
+            const pairs = rounds[0].length;
+            const pages = [];
+            if (pairs <= PRINT_SECTION_R1) {
+                pages.push({ title: '', rStart: 0, rEnd: rounds.length - 1, range: r => [0, rounds[r].length] });
+            } else {
+                const sections = pairs / PRINT_SECTION_R1;
+                const secLastRound = Math.log2(PRINT_SECTION_R1);             // 0-based：第 5 輪
+                for (let k = 0; k < sections; k++) {
+                    pages.push({
+                        title: `第 ${k + 1} 區（共 ${sections} 區）`,
+                        rStart: 0, rEnd: secLastRound,
+                        range: r => { const n = PRINT_SECTION_R1 / Math.pow(2, r); return [k * n, (k + 1) * n]; }
+                    });
+                }
+                pages.push({ title: '決賽階段（各區冠軍晉級）', rStart: secLastRound + 1, rEnd: rounds.length - 1, range: r => [0, rounds[r].length] });
+            }
+            const t = new Date();
+            const printedAt = `${t.getFullYear()}/${pad2(t.getMonth() + 1)}/${pad2(t.getDate())} ${pad2(t.getHours())}:${pad2(t.getMinutes())}`;
+            const ctx = { withResults, printedAt };
+            return pages.map((pg, i) => printPageHTML(pg, i + 1, pages.length, ctx)).join('');
+        }
+
+        function printBracket() {
+            if (!state.rounds.length) { showToast('尚未建立賽程，無法列印', 'fa-triangle-exclamation'); return; }
+            $('printRoot').innerHTML = buildPrintSheet($('printResultsCheck').checked);
+            showToast('正在開啟列印視窗…（建議選 A4、橫向、邊界預設）', 'fa-print');
+            setTimeout(() => {
+                try { window.print(); }
+                catch (e) { showToast('此瀏覽器無法直接列印，請改用 Ctrl+P（Mac：⌘+P）', 'fa-triangle-exclamation'); }
+            }, 150);
+        }
+
         /* ============================================================
          * 後台驗證
          * ============================================================ */
@@ -1298,6 +1468,7 @@
             $('btnClearAllNames').addEventListener('click', () => { $('playerListInput').value = ''; updateSeedCalcDisplay(); });
 
             $('btnCreateBracket').addEventListener('click', createBracketFromForm);
+            $('btnPrintBracket').addEventListener('click', printBracket);
 
             $('btnResetBracket').addEventListener('click', () => {
                 if (!state.rounds.length) { showToast('尚未建立賽程', 'fa-triangle-exclamation'); return; }
