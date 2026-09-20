@@ -403,19 +403,59 @@
         const MAX_PLAYERS = 128;
         const SHEETJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 
-        const MODE = (typeof google !== 'undefined' && google.script && google.script.run) ? 'gas' : 'local';
+        /*
+         * ★ 放在 GitHub Pages（或任何靜態網站）時，請把 Apps Script 部署後的網址（結尾是 /exec）貼在下面引號內。
+         *   例如：const API_URL = 'https://script.google.com/macros/s/AKfycb.../exec';
+         *   留空則為「本機模式」（資料只存在各自的瀏覽器，別人看不到）。
+         */
+        const API_URL = 'https://script.google.com/macros/s/AKfycbyNzmMlzatXEjoyF7_WBz_uUAmlD6vQ5lRycEJ73K13oQXiXn778s_jWV2ZRufs0v0-/exec';
+
+        const API_BASE = String(window.BEYBLADE_API_URL || API_URL || '').trim();
+        const MODE = (typeof google !== 'undefined' && google.script && google.script.run) ? 'gas'
+            : /^https:\/\/script\.google(usercontent)?\.com\//.test(API_BASE) ? 'api'
+            : 'local';
+        const CLOUD = MODE !== 'local';        // gas / api 都是「資料存在雲端」
 
         const store = {
             get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
             set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
         };
 
-        function gas(name, ...args) {
+        function gasRun(name, ...args) {
             return new Promise((resolve, reject) => {
                 google.script.run
                     .withSuccessHandler(resolve)
                     .withFailureHandler(e => reject(new Error(e && e.message ? e.message : String(e))))[name](...args);
             });
+        }
+
+        // 透過 fetch 呼叫 Apps Script 網頁應用程式（GitHub Pages 等外部網站使用）
+        async function apiFetch(name, args) {
+            let res;
+            try {
+                if (name === 'getState') {
+                    res = await fetch(`${API_BASE}?action=getState&t=${Date.now()}`, { redirect: 'follow' });
+                } else {
+                    // 用 text/plain 送出，避免瀏覽器的 CORS 預檢（Apps Script 不支援預檢）
+                    res = await fetch(API_BASE, {
+                        method: 'POST',
+                        redirect: 'follow',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ action: name, args })
+                    });
+                }
+            } catch (e) {
+                throw new Error('無法連線到雲端，請檢查網路，或確認 Apps Script 部署的存取權是「所有人」');
+            }
+            let data;
+            try { data = JSON.parse(await res.text()); }
+            catch (e) { throw new Error('雲端回應異常，請確認網址結尾是 /exec，且部署的存取權是「所有人」'); }
+            if (!data.ok) throw new Error(data.error || '雲端處理失敗');
+            return data.data;
+        }
+
+        function callBackend(name, ...args) {
+            return MODE === 'gas' ? gasRun(name, ...args) : apiFetch(name, args);
         }
 
         const cyrb53 = (str, seed = 0) => {
@@ -770,7 +810,7 @@
             try {
                 do {
                     pushQueued = false;
-                    await gas('saveState', JSON.stringify(state), adminPass);
+                    await callBackend('saveState', JSON.stringify(state), adminPass);
                 } while (pushQueued);
                 setSyncStatus('ok');
             } catch (e) {
@@ -808,17 +848,21 @@
             return true;
         }
 
+        let lastPollError = '';
         async function pollRemote() {
             try {
-                if (MODE === 'gas') {
-                    applyRemote(await gas('getState'));
+                if (CLOUD) {
+                    applyRemote(await callBackend('getState'));
                     setSyncStatus('ok');
                 } else {
                     applyRemote(store.get(STORAGE_KEY));
                 }
+                return true;
             } catch (e) {
                 console.error(e);
                 setSyncStatus('err');
+                lastPollError = e.message;
+                return false;
             } finally {
                 if (!loaded) { loaded = true; renderAll(); }
             }
@@ -1078,7 +1122,7 @@
 
         async function fetchSheetRows(url) {
             if (!/\/d\/[a-zA-Z0-9_-]+/.test(url)) throw new Error('連結格式不正確，請貼上完整的 Google 試算表網址');
-            if (MODE === 'gas') return gas('readSheet', url, adminPass);   // 由你的 Google 帳號讀取，私人檔案也可
+            if (CLOUD) return callBackend('readSheet', url, adminPass);   // 由你的 Google 帳號讀取，私人檔案也可
 
             // local 模式：需將試算表共用設定為「知道連結的任何人都能檢視」
             const id = /\/d\/([a-zA-Z0-9_-]+)/.exec(url)[1];
@@ -1428,8 +1472,8 @@
             const entered = $('adminPasswordInput').value;
             let ok = false;
             try {
-                ok = MODE === 'gas'
-                    ? await gas('verifyPassword', entered)
+                ok = CLOUD
+                    ? await callBackend('verifyPassword', entered)
                     : cyrb53('bey-arena:' + entered) === LOCAL_PASS_HASH;
             } catch (e) {
                 showToast(e.message, 'fa-triangle-exclamation');
@@ -1472,7 +1516,7 @@
         }
 
         async function requireAdmin() {
-            if (MODE === 'gas' && !adminPass) { showToast('請先解鎖後台', 'fa-lock'); return false; }
+            if (CLOUD && !adminPass) { showToast('請先解鎖後台', 'fa-lock'); return false; }
             return true;
         }
 
@@ -1576,14 +1620,15 @@
             $('tabBracketTree').addEventListener('click', () => setViewTab('tree'));
 
             $('btnRefresh').addEventListener('click', async () => {
-                await pollRemote();
-                showToast('已更新至最新對戰進度', 'fa-arrows-rotate');
+                const okPoll = await pollRemote();
+                if (okPoll) showToast('已更新至最新對戰進度', 'fa-arrows-rotate');
+                else showToast('更新失敗：' + lastPollError, 'fa-triangle-exclamation');
             });
 
             // --- 載入資料並開始輪詢（gas 模式）---
             renderAll();
             pollRemote();
-            if (MODE === 'gas') {
+            if (CLOUD) {
                 setInterval(() => { if (!document.hidden) pollRemote(); }, POLL_INTERVAL_MS);
                 document.addEventListener('visibilitychange', () => { if (!document.hidden) pollRemote(); });
             }
